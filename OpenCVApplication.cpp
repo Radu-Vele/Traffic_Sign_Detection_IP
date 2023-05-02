@@ -147,18 +147,22 @@ Mat cannyEdgeDetection(Mat src) {
 	float sobel_scaling_factor = 1 / (4 * sqrt(2));
 	scaled_magnitude_max = scaleMatrix(magnitude_max, sobel_scaling_factor);
 	int* magnitude_histogram_scaled = computeHistogram(scaled_magnitude_max);
-	
-	int p_value = 0.1; // set value between 0.01 and 0.1
-	int nr_no_edge_pixels = (1 - p_value) * (rows - 1 + cols - 1 - magnitude_histogram_scaled[0]);
+
+	float p_value = 0.06; // set value between 0.01 and 0.1
+	int nr_no_edge_pixels = (int) ((1 - p_value) * (float)((rows - 1) * (cols - 1) - magnitude_histogram_scaled[0]));
+
+	printf("no edge pix %d\n", nr_no_edge_pixels);
 
 	int hist_count = 0;
 	int adaptive_threshold = 0;
-	for (int adaptive_threshold = 1; adaptive_threshold < 255; adaptive_threshold++) {
+	for (adaptive_threshold = 1; adaptive_threshold < 255; adaptive_threshold++) {
 		if (hist_count >= nr_no_edge_pixels) {
 			break;
 		}
 		hist_count += magnitude_histogram_scaled[adaptive_threshold];
 	}
+
+	printf("th %d\n", adaptive_threshold);
 
 	scaled_magnitude_max_adaptive = scaled_magnitude_max.clone();
 	for (int i = 1; i < rows - 1; i++) {
