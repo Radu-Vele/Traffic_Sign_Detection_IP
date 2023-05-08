@@ -96,28 +96,6 @@ int* computeHistogram(Mat src) {
 	return histogram;
 }
 
-void showHistogram(const std::string& name, int* hist, const int  hist_cols, const int hist_height)
-{
-	Mat imgHist(hist_height, hist_cols, CV_8UC3, CV_RGB(255, 255, 255)); // constructs a white image
-
-	//computes histogram maximum
-	int max_hist = 0;
-	for (int i = 0; i < hist_cols; i++)
-		if (hist[i] > max_hist)
-			max_hist = hist[i];
-	double scale = 1.0;
-	scale = (double)hist_height / max_hist;
-	int baseline = hist_height - 1;
-
-	for (int x = 0; x < hist_cols; x++) {
-		Point p1 = Point(x, baseline);
-		Point p2 = Point(x, baseline - cvRound(hist[x] * scale));
-		line(imgHist, p1, p2, CV_RGB(255, 0, 255)); // histogram bins colored in magenta
-	}
-
-	imshow(name, imgHist);
-}
-
 Mat cannyEdgeDetection(Mat src) {
 	int rows = src.rows;
 	int cols = src.cols;
@@ -139,19 +117,11 @@ Mat cannyEdgeDetection(Mat src) {
 	for (int i = 1; i < rows - 1; i++) {
 		for (int j = 1; j < cols - 1; j++) {
 			double delta_x = computeConvolution(src_blurred, i, j, sobel_x);
-			double delta_y = computeConvolution(src_blurred, i, j, sobel_y);
+			double delta_y = computeConvolution(src_blurred, i, j, sobel_y); //TODO: Shouldn't we apply the vertical convolution on the intermmediate image obtained after applying the horizontal convolution? I don't think so
 			magnitude.at<float>(i, j) = (float) sqrt(pow(delta_x, 2) + pow(delta_y, 2));
 			angle.at<float>(i, j) = (float)(atan2(delta_y, delta_x) * (180.0 / PI));
 		}
 	}
-
-	// DEBUG
-	Mat magn_normalized(rows, cols, CV_8UC1);
-	convertScaleAbs(magnitude, magn_normalized);
-
-	imshow("Normalized Magnitude", magn_normalized);
-	//---
-
 	
 	//Non-maxima suppression
 	for (int i = 1; i < rows - 1; i++) {
@@ -169,15 +139,13 @@ Mat cannyEdgeDetection(Mat src) {
 
 	int* magnitude_histogram_scaled = computeHistogram(scaled_magnitude_max);
 
-	showHistogram("hist", magnitude_histogram_scaled, 255, 1000);
-	float p_value = 0.45; // set value between 0.01 and 0.1
+	float p_value = 0.45; // set value between 0.01 and 0.1 ??
 	int nr_no_edge_pixels = (int)((1 - p_value) * (float)((rows - 2) * (cols - 2) - magnitude_histogram_scaled[0]));
 
 	int hist_count = 0;
 	int adaptive_threshold = 0;
 	for (adaptive_threshold = 1; adaptive_threshold < 256; adaptive_threshold++) {
 		hist_count += magnitude_histogram_scaled[adaptive_threshold];
-		printf("%d %d \n", adaptive_threshold, hist_count);
 		if (hist_count >= nr_no_edge_pixels) {
 			break;
 		}
@@ -192,15 +160,16 @@ Mat cannyEdgeDetection(Mat src) {
 	}
 
 	imshow("adaptive", scaled_magnitude_max_adaptive);
-
 	free(magnitude_histogram_scaled);
+
+	//Weak edge removal
+
 	return src_blurred;
 }
 
 void processInput() {
-	/*Mat input_color = imread("./Images/harbor.bmp", IMREAD_COLOR);
-	Mat input_gray = colorToGrayscale(input_color);*/
-	Mat input_gray = imread("./Images/saturn.bmp", IMREAD_GRAYSCALE);
+	Mat input_color = imread("./Images/harbor.bmp", IMREAD_COLOR);
+	Mat input_gray = colorToGrayscale(input_color);
 	imshow("Input Gray", input_gray);
 	cannyEdgeDetection(input_gray);
 	waitKey(0);
