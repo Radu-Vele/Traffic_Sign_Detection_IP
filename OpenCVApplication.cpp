@@ -1,5 +1,7 @@
 #include "stdafx.h"
 #include "common.h"
+#include <queue>
+#include <unordered_map>
 
 #define MEM_ALLOC_ERR "Error: Failed to allocate memory on the heap.\n"
 #define MEM_ERR_CODE -1
@@ -24,7 +26,7 @@ Mat gaussianBlur(Mat src) {
 	int rows = src.rows;
 	int cols = src.cols;
 	double gaussian_kernel[9] = { 1.0 / 16, 2.0 / 16, 1.0 / 16, 2.0 / 16, 4.0 / 16, 2.0 / 16, 1.0 / 16, 2.0 / 16, 1.0 / 16 };
-	Mat dst(rows, cols, CV_8UC1);
+	Mat dst(rows, cols, CV_8UC1, Scalar(0));
 
 	for (int i = 1; i < rows - 1; i++) {
 		for (int j = 1; j < cols - 1; j++) {
@@ -96,6 +98,20 @@ int* computeHistogram(Mat src) {
 	return histogram;
 }
 
+/**
+* Considers the image border as out of bounds
+*/
+bool outOfBounds(int curr_i, int curr_j, int rows, int cols) {
+	if (curr_i >= rows - 1 || curr_i < 1) {
+		return true;
+	}
+	if (curr_j >= cols - 1 || curr_j < 1) {
+		return true;
+	}
+	return false;
+}
+
+
 Mat cannyEdgeDetection(Mat src) {
 	int rows = src.rows;
 	int cols = src.cols;
@@ -104,9 +120,9 @@ Mat cannyEdgeDetection(Mat src) {
 	Mat angle(rows, cols, CV_32FC1); // buffer for computed angles
 	Mat magnitude_max(rows, cols, CV_32FC1, Scalar(0)); // buffer for the maximum magnitudes on edge
 	Mat scaled_magnitude_max;
-	Mat scaled_magnitude_max_adaptive(rows, cols, CV_8UC1, Scalar(0));
+	Mat scaled_magnitude_th(rows, cols, CV_8UC1, Scalar(0));
 	
-	//blur input image
+	//blur input
 	Mat src_blurred = gaussianBlur(src);
 	imshow("Blurred", src_blurred);	
 
@@ -117,7 +133,7 @@ Mat cannyEdgeDetection(Mat src) {
 	for (int i = 1; i < rows - 1; i++) {
 		for (int j = 1; j < cols - 1; j++) {
 			double delta_x = computeConvolution(src_blurred, i, j, sobel_x);
-			double delta_y = computeConvolution(src_blurred, i, j, sobel_y); //TODO: Shouldn't we apply the vertical convolution on the intermmediate image obtained after applying the horizontal convolution? I don't think so
+			double delta_y = computeConvolution(src_blurred, i, j, sobel_y);
 			magnitude.at<float>(i, j) = (float) sqrt(pow(delta_x, 2) + pow(delta_y, 2));
 			angle.at<float>(i, j) = (float)(atan2(delta_y, delta_x) * (180.0 / PI));
 		}
@@ -139,7 +155,7 @@ Mat cannyEdgeDetection(Mat src) {
 
 	int* magnitude_histogram_scaled = computeHistogram(scaled_magnitude_max);
 
-	float p_value = 0.45; // set value between 0.01 and 0.1 ??
+	float p_value = 0.1;
 	int nr_no_edge_pixels = (int)((1 - p_value) * (float)((rows - 2) * (cols - 2) - magnitude_histogram_scaled[0]));
 
 	int hist_count = 0;
@@ -150,28 +166,104 @@ Mat cannyEdgeDetection(Mat src) {
 			break;
 		}
 	}
-	
+
 	for (int i = 1; i < rows - 1; i++) {
 		for (int j = 1; j < cols - 1; j++) {
-			if (scaled_magnitude_max.at<float>(i, j) > adaptive_threshold) { // or magnitude_max?
-				scaled_magnitude_max_adaptive.at<uchar>(i, j) = 255;
+			scaled_magnitude_th.at<uchar>(i, j) = (uchar)scaled_magnitude_max.at<float>(i, j);
+		}
+	}
+
+	free(magnitude_histogram_scaled);
+	
+	//Weak edge removal
+	float k = 0.4;
+
+	//Label matrix elements as strong (255), weak (128) or no edge (0)
+	int threshold_low = (int)(k * (float) adaptive_threshold);
+
+	for (int i = 1; i < rows - 1; i++) {
+		for (int j = 1; j < cols - 1; j++) {
+			uchar curr_val = scaled_magnitude_th.at<uchar>(i, j);
+
+			if (curr_val < threshold_low) { // no edge
+				scaled_magnitude_th.at<uchar>(i, j) = 0;
+			}
+			else if (curr_val < adaptive_threshold) { // weak edge
+				scaled_magnitude_th.at<uchar>(i, j) = 128;
+			}
+			else { // strong edge
+				scaled_magnitude_th.at<uchar>(i, j) = 255;
 			}
 		}
 	}
 
-	imshow("adaptive", scaled_magnitude_max_adaptive);
-	free(magnitude_histogram_scaled);
+	printf("%u\n", scaled_magnitude_th.at<uchar>(0, 0));
 
-	//Weak edge removal
+	
+	Mat visited_mask(rows, cols, CV_8UC1, Scalar(0)); //keep track of visited nodes (may be replaced with a map or so)
+	int neigh_nr = 8;
+	int offset_i[8] = {-1, -1, -1, 0, 0, 1, 1, 1};
+	int offset_j[8] = {-1, 0, 1, -1, 1, -1, 0, 1};
 
-	return src_blurred;
+	
+
+	for (int i = 1; i < rows - 1; i++) {
+		for (int j = 1; j < cols - 1; j++) {
+			if (scaled_magnitude_th.at<uchar>(i, j) == 255 && visited_mask.at<uchar>(i, j) != 255) { // found the first unvisited strong edge.
+				std::queue<Point> queue; // empty queue for the bfs
+				visited_mask.at<uchar>(i, j) = 255;
+				queue.push(Point(i, j));
+				
+				while (!queue.empty()) {
+					Point curr = queue.front();
+					queue.pop();
+
+					for (int k = 0; k < neigh_nr; k++) { //check neighboring endges
+						int new_i = curr.x + offset_i[k];
+						int new_j = curr.y + offset_j[k];
+
+						if (!outOfBounds(new_i, new_j, rows, cols)) {
+							//mark the weak edge points as strong edges
+							if (scaled_magnitude_th.at<uchar>(new_i, new_j) == 128) {
+								scaled_magnitude_th.at<uchar>(new_i, new_j) = 255;
+								if (visited_mask.at<uchar>(new_i, new_j) == 0) { //not visited
+									visited_mask.at<uchar>(new_i, new_j) = 255;
+									queue.push(Point(new_i, new_j)); //add all strong (prv. weak) edge neighbors to the queue
+								}
+							}
+							else if (scaled_magnitude_th.at<uchar>(new_i, new_j) == 255) {
+								if (visited_mask.at<uchar>(new_i, new_j) == 0) { //not visited
+									visited_mask.at<uchar>(new_i, new_j) = 255;
+									queue.push(Point(new_i, new_j)); //add all strong edge neighbors to the queue
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	//eliminate all remaining weak edges
+	for (int i = 1; i < rows - 1; i++) {
+		for (int j = 1; j < cols - 1; j++) {
+			if (scaled_magnitude_th.at<uchar>(i, j) == 128) {
+				scaled_magnitude_th.at<uchar>(i, j) = 0;
+			}
+		}
+	}
+
+	return scaled_magnitude_th;
 }
 
 void processInput() {
 	Mat input_color = imread("./Images/harbor.bmp", IMREAD_COLOR);
 	Mat input_gray = colorToGrayscale(input_color);
 	imshow("Input Gray", input_gray);
-	cannyEdgeDetection(input_gray);
+	Mat detected_edges = cannyEdgeDetection(input_gray);
+	imshow("Detected Edges", detected_edges);
+	cv::
+	imwrite("./Images/edges.bmp", detected_edges);
 	waitKey(0);
 }
 
