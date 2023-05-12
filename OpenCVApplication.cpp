@@ -116,8 +116,8 @@ Mat cannyEdgeDetection(Mat src) {
 	int rows = src.rows;
 	int cols = src.cols;
 
-	Mat magnitude(rows, cols, CV_32FC1); // buffer for computed magnitude
-	Mat angle(rows, cols, CV_32FC1); // buffer for computed angles
+	Mat magnitude(rows, cols, CV_32FC1, Scalar(0)); // buffer for computed magnitude
+	Mat angle(rows, cols, CV_32FC1, Scalar(0)); // buffer for computed angles
 	Mat magnitude_max(rows, cols, CV_32FC1, Scalar(0)); // buffer for the maximum magnitudes on edge
 	Mat scaled_magnitude_max;
 	Mat scaled_magnitude_th(rows, cols, CV_8UC1, Scalar(0));
@@ -130,8 +130,8 @@ Mat cannyEdgeDetection(Mat src) {
 	double sobel_x[9] = { -1, 0, 1, -2, 0, 2, -1, 0, 1 };
 	double sobel_y[9] = { 1, 2, 1, 0, 0 , 0, -1, -2, -1 };
 
-	for (int i = 1; i < rows - 1; i++) {
-		for (int j = 1; j < cols - 1; j++) {
+	for (int i = 2; i < rows - 2; i++) {
+		for (int j = 2; j < cols - 2; j++) {
 			double delta_x = computeConvolution(src_blurred, i, j, sobel_x);
 			double delta_y = computeConvolution(src_blurred, i, j, sobel_y);
 			magnitude.at<float>(i, j) = (float) sqrt(pow(delta_x, 2) + pow(delta_y, 2));
