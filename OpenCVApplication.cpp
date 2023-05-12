@@ -124,7 +124,6 @@ Mat cannyEdgeDetection(Mat src) {
 	
 	//blur input
 	Mat src_blurred = gaussianBlur(src);
-	imshow("Blurred", src_blurred);	
 
 	//kernels
 	double sobel_x[9] = { -1, 0, 1, -2, 0, 2, -1, 0, 1 };
@@ -196,9 +195,6 @@ Mat cannyEdgeDetection(Mat src) {
 			}
 		}
 	}
-
-	printf("%u\n", scaled_magnitude_th.at<uchar>(0, 0));
-
 	
 	Mat visited_mask(rows, cols, CV_8UC1, Scalar(0)); //keep track of visited nodes (may be replaced with a map or so)
 	int neigh_nr = 8;
@@ -262,7 +258,6 @@ void processInput() {
 	imshow("Input Gray", input_gray);
 	Mat detected_edges = cannyEdgeDetection(input_gray);
 	imshow("Detected Edges", detected_edges);
-	cv::
 	imwrite("./Images/edges.bmp", detected_edges);
 	waitKey(0);
 }
