@@ -3,10 +3,21 @@
 #include <queue>
 #include <unordered_map>
 
+using namespace std;
+
 #define MEM_ALLOC_ERR "Error: Failed to allocate memory on the heap.\n"
 #define MEM_ERR_CODE -1
 
 double computeConvolution(Mat src, int i, int j, double* kernel);
+
+int n8_di[8] = { 0,-1,-1, -1, 0, 1, 1, 1 };
+int n8_dj[8] = { 1, 1, 0, -1, -1,-1, 0, 1 };
+
+struct s_labels {
+	Mat labels;
+	int no_labels;
+	int* pixel_count;
+};
 
 Mat colorToGrayscale(Mat src) {
 	int rows = src.rows;
@@ -30,7 +41,7 @@ Mat gaussianBlur(Mat src) {
 
 	for (int i = 1; i < rows - 1; i++) {
 		for (int j = 1; j < cols - 1; j++) {
-			dst.at<uchar>(i, j) = (uchar) computeConvolution(src, i, j, gaussian_kernel);
+			dst.at<uchar>(i, j) = (uchar)computeConvolution(src, i, j, gaussian_kernel);
 		}
 	}
 
@@ -90,7 +101,7 @@ int* computeHistogram(Mat src) {
 	for (int i = 1; i < rows - 1; i++) {
 		for (int j = 1; j < cols - 1; j++) {
 			float pixel_value = src.at<float>(i, j);
-			int index = (int) pixel_value;
+			int index = (int)pixel_value;
 			histogram[index]++;
 		}
 	}
@@ -121,7 +132,7 @@ Mat cannyEdgeDetection(Mat src) {
 	Mat magnitude_max(rows, cols, CV_32FC1, Scalar(0)); // buffer for the maximum magnitudes on edge
 	Mat scaled_magnitude_max;
 	Mat scaled_magnitude_th(rows, cols, CV_8UC1, Scalar(0));
-	
+
 	//blur input
 	Mat src_blurred = gaussianBlur(src);
 
@@ -133,14 +144,14 @@ Mat cannyEdgeDetection(Mat src) {
 		for (int j = 2; j < cols - 2; j++) {
 			double delta_x = computeConvolution(src_blurred, i, j, sobel_x);
 			double delta_y = computeConvolution(src_blurred, i, j, sobel_y);
-			magnitude.at<float>(i, j) = (float) sqrt(pow(delta_x, 2) + pow(delta_y, 2));
+			magnitude.at<float>(i, j) = (float)sqrt(pow(delta_x, 2) + pow(delta_y, 2));
 			angle.at<float>(i, j) = (float)(atan2(delta_y, delta_x) * (180.0 / PI));
 		}
 	}
-	
+
 	//Non-maxima suppression
 	for (int i = 1; i < rows - 1; i++) {
-		for (int j = 1; j < cols -1; j++) {
+		for (int j = 1; j < cols - 1; j++) {
 			if (isMaxOnDir(i, j, magnitude, angle.at<float>(i, j))) {
 				magnitude_max.at<float>(i, j) = magnitude.at<float>(i, j);
 			}
@@ -173,12 +184,12 @@ Mat cannyEdgeDetection(Mat src) {
 	}
 
 	free(magnitude_histogram_scaled);
-	
+
 	//Weak edge removal
 	float k = 0.4;
 
 	//Label matrix elements as strong (255), weak (128) or no edge (0)
-	int threshold_low = (int)(k * (float) adaptive_threshold);
+	int threshold_low = (int)(k * (float)adaptive_threshold);
 
 	for (int i = 1; i < rows - 1; i++) {
 		for (int j = 1; j < cols - 1; j++) {
@@ -195,13 +206,13 @@ Mat cannyEdgeDetection(Mat src) {
 			}
 		}
 	}
-	
+
 	Mat visited_mask(rows, cols, CV_8UC1, Scalar(0)); //keep track of visited nodes (may be replaced with a map or so)
 	int neigh_nr = 8;
-	int offset_i[8] = {-1, -1, -1, 0, 0, 1, 1, 1};
-	int offset_j[8] = {-1, 0, 1, -1, 1, -1, 0, 1};
+	int offset_i[8] = { -1, -1, -1, 0, 0, 1, 1, 1 };
+	int offset_j[8] = { -1, 0, 1, -1, 1, -1, 0, 1 };
 
-	
+
 
 	for (int i = 1; i < rows - 1; i++) {
 		for (int j = 1; j < cols - 1; j++) {
@@ -209,7 +220,7 @@ Mat cannyEdgeDetection(Mat src) {
 				std::queue<Point> queue; // empty queue for the bfs
 				visited_mask.at<uchar>(i, j) = 255;
 				queue.push(Point(i, j));
-				
+
 				while (!queue.empty()) {
 					Point curr = queue.front();
 					queue.pop();
@@ -252,6 +263,108 @@ Mat cannyEdgeDetection(Mat src) {
 	return scaled_magnitude_th;
 }
 
+Mat inverseColors (Mat src) {
+
+	Mat result = src.clone();
+	int rows = src.rows;
+	int cols = src.cols;
+
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			result.at<uchar>(i, j) = 255 - src.at<uchar>(i, j);
+		}
+	}
+
+	return result;
+     
+}
+
+s_labels BFS_labeling(Mat source) {
+
+	Mat labels;
+	int rows, cols;
+	int label;
+	int curr_x, curr_y;
+	int count[1000];
+
+	rows = source.rows;
+	cols = source.cols;
+	label = 0;
+	labels = Mat::zeros(rows, cols, CV_8UC1);
+
+	for (int i = 0; i < 1000; i++) {
+		count[i] = 0;
+	}
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			if (source.at<uchar>(i, j) == 0 && labels.at<uchar>(i, j) == 0) {
+				label++;
+				queue<Point> queue;
+				labels.at<uchar>(i, j) = label;
+				queue.push(Point(i, j));
+				while (!queue.empty()) {
+					Point q = queue.front();
+					queue.pop();
+					for (int idx = 0; idx < 8; idx++) {
+						curr_x = q.x + n8_di[idx];
+						curr_y = q.y + n8_dj[idx];
+						if (curr_x >= 0 && curr_x < rows && curr_y >= 0 && curr_y < cols) {
+							if (source.at<uchar>(curr_x, curr_y) == 0 && labels.at<uchar>(curr_x, curr_y) == 0) {
+								labels.at<uchar>(curr_x, curr_y) = label;
+								count[label] ++;
+								queue.push(Point(curr_x, curr_y));
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return { labels, label, count };
+}
+
+
+Mat color_labels(s_labels labels_str) {
+
+	int rows, cols, no_labels, current;
+	int* count;
+	Mat labels, result;
+	Vec3b* colors;
+
+	labels = labels_str.labels;
+	rows = labels_str.labels.rows;
+	cols = labels_str.labels.cols;
+	no_labels = labels_str.no_labels;
+	count = labels_str.pixel_count;
+	result = Mat::zeros(rows, cols, CV_8UC3);
+
+	colors = new Vec3b[no_labels];
+	for (int i = 0; i < no_labels; i++) {
+		colors[i] = Vec3b(rand() % 256, rand() % 256, rand() % 256);
+	}
+	colors[0] = Vec3b(255, 255, 255);
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			current = labels.at<uchar>(i, j);
+			if(count[current] > 200) 
+				result.at<Vec3b>(i, j) = colors[current];
+		}
+	}
+
+	return result;
+
+}
+
+Mat smallEdgeFilter(Mat src) {
+
+	Mat reverse_edges = inverseColors(src);
+	s_labels connected = BFS_labeling(reverse_edges);
+	return color_labels(connected);
+
+}
+
+
 void processInput() {
 	Mat input_color = imread("./Images/harbor.bmp", IMREAD_COLOR);
 	Mat input_gray = colorToGrayscale(input_color);
@@ -259,6 +372,8 @@ void processInput() {
 	Mat detected_edges = cannyEdgeDetection(input_gray);
 	imshow("Detected Edges", detected_edges);
 	imwrite("./Images/edges.bmp", detected_edges);
+	Mat large_edges = smallEdgeFilter(detected_edges);
+	imshow("Large Edges", large_edges);
 	waitKey(0);
 }
 
