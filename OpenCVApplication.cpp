@@ -4,20 +4,31 @@
 #include <unordered_map>
 
 using namespace std;
+using namespace cv;
 
 #define MEM_ALLOC_ERR "Error: Failed to allocate memory on the heap.\n"
 #define MEM_ERR_CODE -1
 
-double computeConvolution(Mat src, int i, int j, double* kernel);
 
 int n8_di[8] = { 0,-1,-1, -1, 0, 1, 1, 1 };
 int n8_dj[8] = { 1, 1, 0, -1, -1,-1, 0, 1 };
 
+Mat input_color = imread("./Images/harbor.bmp", IMREAD_COLOR);
+//Mat input_color = imread("./Images/test1.bmp", IMREAD_COLOR);
 struct s_labels {
 	Mat labels;
 	int no_labels;
-	int* pixel_count;
+	int* size;
 };
+
+typedef struct contour {
+	vector<Point> border;
+	vector<int> dir_vector;
+	bool loop;
+	int size;
+};
+
+double computeConvolution(Mat src, int i, int j, double* kernel);
 
 Mat colorToGrayscale(Mat src) {
 	int rows = src.rows;
@@ -263,22 +274,6 @@ Mat cannyEdgeDetection(Mat src) {
 	return scaled_magnitude_th;
 }
 
-Mat inverseColors (Mat src) {
-
-	Mat result = src.clone();
-	int rows = src.rows;
-	int cols = src.cols;
-
-	for (int i = 0; i < rows; i++) {
-		for (int j = 0; j < cols; j++) {
-			result.at<uchar>(i, j) = 255 - src.at<uchar>(i, j);
-		}
-	}
-
-	return result;
-     
-}
-
 s_labels BFS_labeling(Mat source) {
 
 	Mat labels;
@@ -325,56 +320,353 @@ s_labels BFS_labeling(Mat source) {
 }
 
 
-Mat color_labels(s_labels labels_str) {
+Point find_P_0(Mat source) {
+	/*
+	 * Find the initial point of the contour and return it
+	 */
+	Point P_0;
 
-	int rows, cols, no_labels, current;
-	int* count;
-	Mat labels, result;
-	Vec3b* colors;
+	//*****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-	labels = labels_str.labels;
-	rows = labels_str.labels.rows;
-	cols = labels_str.labels.cols;
-	no_labels = labels_str.no_labels;
-	count = labels_str.pixel_count;
-	result = Mat::zeros(rows, cols, CV_8UC3);
-
-	colors = new Vec3b[no_labels];
-	for (int i = 0; i < no_labels; i++) {
-		colors[i] = Vec3b(rand() % 256, rand() % 256, rand() % 256);
+	for (int i = source.rows - 1; i >= 0; i--) {
+		for (int j = source.cols - 1; j >= 0; j--) {
+			if (source.at<uchar>(i, j) != 255) {
+				P_0.x = i;
+				P_0.y = j;
+				break;
+			}
+		}
 	}
-	colors[0] = Vec3b(255, 255, 255);
+
+	//*****END OF YOUR CODE(DO NOT DELETE / MODIFY THIS LINE) *****
+
+	return P_0;
+}
+
+contour extract_contour(Mat source, Point P_0) {
+
+	/*
+	 * Use the border tracing algorithm in order to extract the contour
+	 * Save it as a vector of points and a vector of directions
+	 */
+
+	int dir, next_dir, curr_dir, k, size = 1;
+	Point P_current;
+	std::vector<Point> border;
+	std::vector<int> dir_vector;
+	bool cont = true, found, loop = true;
+	//*****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+	P_current = P_0;
+	border.push_back(P_current);
+	dir = 7;
+	while (cont) {
+		if (dir % 2 == 0) {
+			next_dir = (dir + 7) % 8;
+		}
+		else {
+			next_dir = (dir + 6) % 8;
+		}
+		k = 0;
+		found = false;
+		while (k < 8 && !found) {
+			int new_i = P_current.x + n8_di[next_dir];
+			int new_j = P_current.y + n8_dj[next_dir];
+			if (source.at<uchar>(new_i, new_j) == 0) {
+				P_current.y = new_j;
+				P_current.x = new_i;
+				border.push_back(P_current);
+				dir_vector.push_back(next_dir);
+				dir = next_dir;
+				found = true;
+				size++;
+			}
+			k++;
+			next_dir = (next_dir + 1) % 8;
+		}
+		if (k == 8) {
+			cont = false; 
+			loop = false;
+		}
+		if (border.size() > 2 && border[0] == border[border.size() - 2] && border[border.size() - 1] == border[1]) {
+			cont = false;
+		}
+	}
+		printf("size %d\n", size);
+
+		return { border, dir_vector, loop, size };
+
+	
+}
+
+Mat draw_contour(contour cnt, Mat source) {
+
+	/*
+	 * Draw the contour using the border variable from cnt structure
+	 */
+
+	Mat dst;
+
+	//*****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+	dst = source.clone();
+	for (int i = 0; i < source.rows; i++) {
+		for (int j = 0; j < source.cols; j++) {
+			dst.at<uchar>(i, j) = 255;
+		}
+	}
+	for (int i = 0; i < cnt.border.size(); i++) {
+		dst.at<uchar>(cnt.border[i].x, cnt.border[i].y) = 0;
+	}
+
+	//*****END OF YOUR CODE(DO NOT DELETE / MODIFY THIS LINE) *****
+
+
+	return dst;
+}
+
+
+Mat contour_reconstruction(FILE* pf, Mat background) {
+
+	/*
+	 * From the file read the chain code and reconstruct the image
+	 */
+
+	int x, y, chain_len, dir, count = 0;
+
+	//*****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+	fscanf(pf, "%d %d %d", &x, &y, &chain_len);
+
+	Point P_current = Point(x, y);
+	background.at<uchar>(P_current.y, P_current.x) = 0;
+	for (int i = 0; i < chain_len; i++) {
+		fscanf(pf, "%d", &dir);
+		P_current.x += n8_di[dir];
+		P_current.y += n8_dj[dir];
+		background.at<uchar>(P_current.x, P_current.y) = 0;
+	}
+	//*****END OF YOUR CODE(DO NOT DELETE / MODIFY THIS LINE) *****
+
+	return background;
+
+}
+
+Mat inverseColors(Mat src) {
+
+	Mat result = src.clone();
+	int rows = src.rows;
+	int cols = src.cols;
+
 	for (int i = 0; i < rows; i++) {
 		for (int j = 0; j < cols; j++) {
-			current = labels.at<uchar>(i, j);
-			if(count[current] > 200) 
-				result.at<Vec3b>(i, j) = colors[current];
+			result.at<uchar>(i, j) = 255 - src.at<uchar>(i, j);
 		}
 	}
 
 	return result;
-
 }
 
-Mat smallEdgeFilter(Mat src) {
+Point getCenter(Mat binary_object) {
 
-	Mat reverse_edges = inverseColors(src);
-	s_labels connected = BFS_labeling(reverse_edges);
-	return color_labels(connected);
+	int rows = binary_object.rows;
+	int cols = binary_object.cols;
 
+	Point center_mass;
+	long long x = 0, y = 0;
+	int area = 0;
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			if (binary_object.at<uchar>(i, j) == 0) {
+				x += j;
+				y += i;
+				area++;
+			}
+		}
+	}
+	center_mass.x = x / area;
+	center_mass.y = y / area;
+
+	return center_mass;
+}
+
+Mat display_center_of_mass(Point center_of_mass, Mat source) {
+
+	/*
+	 * This method will display on the source image the center_of_mass
+	 * Hint: Use the circle method from OpenCv, clone the source
+	 */
+	Mat result;
+	//*****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+	result = source.clone();
+	circle(result, center_of_mass, 5, Scalar(0, 0, 0), 1);
+	//*****END OF YOUR CODE(DO NOT DELETE / MODIFY THIS LINE) ****
+
+	return result;
+}
+Mat deleteEdge(Mat src, Mat edge) {
+
+	int rows = src.rows;
+	int cols = src.cols;
+
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			if (edge.at<uchar>(i, j) == 0) {
+				src.at<uchar>(i, j) = 255;
+			}
+		}
+	}
+	return src;
+}
+
+vector<int> getSignature(contour cnt, Point center) {
+
+	vector<int> signature;
+	vector<Point> border = cnt.border;
+	int size = cnt.size;
+	int dist;
+
+	for (int i = 0; i < size; i++) {
+
+		int x = center.x - border[i].y;
+		int y = center.y - border[i].x;
+		double partial = sqrt(x * x + y * y);
+		printf("%f", partial);
+		dist = (int) sqrt(x * x + y * y);
+		signature.push_back(dist);
+		printf("%d ", dist);
+	}
+
+	return signature;
+}
+
+void showHistogram(const std::string& name, vector<int> hist, const int  hist_cols, const int hist_height)
+{
+	Mat imgHist(hist_height, hist_cols, CV_8UC3, CV_RGB(255, 255, 255)); // constructs a white image
+
+	//computes histogram maximum
+	int max_hist = 0;
+	for (int i = 0; i < hist_cols; i++)
+		if (hist[i] > max_hist)
+			max_hist = hist[i];
+	double scale = 1.0;
+	scale = (double)hist_height / max_hist;
+	int baseline = hist_height - 1;
+
+	for (int x = 0; x < hist_cols; x++) {
+		Point p1 = Point(x, baseline);
+		Point p2 = Point(x, baseline - cvRound(hist[x] * scale));
+		line(imgHist, p1, p2, CV_RGB(255, 0, 255)); // histogram bins colored in magenta
+	}
+
+	imshow(name, imgHist);
+}
+
+bool detectCircle(vector<int> signature) {
+
+	for (int i = 0; i < signature.size(); i++) {
+		if (signature[i] < 70) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void drawResult(Point center, int max) {
+
+	max = (int) (max * 0.2) + max;
+	int x = center.x - max;
+	int y = center.y - max;
+	int width = max * 2;
+	int height = max * 2;
+	// our rectangle...
+	cv::Rect rect(x, y, width, height);
+	// and its top left corner...
+	cv::Point pt1(x, y);
+	// and its bottom right corner.
+	cv::Point pt2(x + width, y + height);
+	// These two calls...
+	cv::rectangle(input_color, pt1, pt2, cv::Scalar(0, 255, 0));
+	
+	imshow("Result", input_color);
+	waitKey(0);
+}
+
+Mat processEdge(Mat src) {
+
+	Point P_0 = find_P_0(src);
+	printf("First %d %d\n", P_0.x, P_0.y);
+	contour cnt = extract_contour(src, P_0);
+
+	Mat mat_cnt = draw_contour(cnt, src);
+	Point center = getCenter(mat_cnt);
+	printf("Center %d %d\n", center.x, center.y);
+
+	
+
+	if (cnt.loop) {
+		vector<int> signature = getSignature(cnt, center);
+		int max = 0;
+		for (int i = 0; i < cnt.size; i++) {
+			if (signature[i] > max) {
+				max = signature[i];
+			}
+		}
+		if (cnt.size > 100) {
+
+			for (int i = 0; i < cnt.size; i++) {
+				signature[i] = (int) 100 * ((float) signature[i] / max);
+			}
+			showHistogram("Signature", signature, 100, cnt.size);
+			if (detectCircle(signature)) {
+				drawResult(center, max);
+			}
+			//imshow("Contour", mat_cnt);
+			imshow("center", display_center_of_mass(center, mat_cnt));
+			waitKey(0);
+		}
+		
+	}
+
+	Mat dst = deleteEdge(src, mat_cnt);
+
+	return dst;
+}
+
+bool isEmpty(Mat src) {
+
+	int rows = src.rows;
+	int cols = src.cols;
+
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			if (src.at<uchar>(i, j) != 255) {
+				return false;
+			}
+		}
+	}
+	return true;
 }
 
 
 void processInput() {
-	Mat input_color = imread("./Images/harbor.bmp", IMREAD_COLOR);
+	
 	Mat input_gray = colorToGrayscale(input_color);
 	imshow("Input Gray", input_gray);
 	Mat detected_edges = cannyEdgeDetection(input_gray);
-	imshow("Detected Edges", detected_edges);
-	imwrite("./Images/edges.bmp", detected_edges);
-	Mat large_edges = smallEdgeFilter(detected_edges);
-	imshow("Large Edges", large_edges);
-	waitKey(0);
+	
+	//imwrite("./Images/edges.bmp", detected_edges);
+	Mat inverse = inverseColors(detected_edges);
+	imshow("Detected Edges", inverse);
+	bool empty = false;
+	while (!empty) {
+		Mat edge = processEdge(inverse);
+		empty = isEmpty(edge);
+	}
+	
+
+	
+	
 }
 
 int main()
