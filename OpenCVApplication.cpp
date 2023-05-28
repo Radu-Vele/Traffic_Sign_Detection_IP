@@ -13,8 +13,11 @@ using namespace cv;
 int n8_di[8] = { 0,-1,-1, -1, 0, 1, 1, 1 };
 int n8_dj[8] = { 1, 1, 0, -1, -1,-1, 0, 1 };
 
-Mat input_color = imread("./Images/harbor.bmp", IMREAD_COLOR);
+//Mat input_color = imread("./Images/harbor.bmp", IMREAD_COLOR);
 //Mat input_color = imread("./Images/test1.bmp", IMREAD_COLOR);
+//Mat input_color = imread("./Images/test2.bmp", IMREAD_COLOR);
+Mat input_color = imread("./Images/test5.bmp", IMREAD_COLOR);
+
 struct s_labels {
 	Mat labels;
 	int no_labels;
@@ -274,51 +277,6 @@ Mat cannyEdgeDetection(Mat src) {
 	return scaled_magnitude_th;
 }
 
-s_labels BFS_labeling(Mat source) {
-
-	Mat labels;
-	int rows, cols;
-	int label;
-	int curr_x, curr_y;
-	int count[1000];
-
-	rows = source.rows;
-	cols = source.cols;
-	label = 0;
-	labels = Mat::zeros(rows, cols, CV_8UC1);
-
-	for (int i = 0; i < 1000; i++) {
-		count[i] = 0;
-	}
-	for (int i = 0; i < rows; i++) {
-		for (int j = 0; j < cols; j++) {
-			if (source.at<uchar>(i, j) == 0 && labels.at<uchar>(i, j) == 0) {
-				label++;
-				queue<Point> queue;
-				labels.at<uchar>(i, j) = label;
-				queue.push(Point(i, j));
-				while (!queue.empty()) {
-					Point q = queue.front();
-					queue.pop();
-					for (int idx = 0; idx < 8; idx++) {
-						curr_x = q.x + n8_di[idx];
-						curr_y = q.y + n8_dj[idx];
-						if (curr_x >= 0 && curr_x < rows && curr_y >= 0 && curr_y < cols) {
-							if (source.at<uchar>(curr_x, curr_y) == 0 && labels.at<uchar>(curr_x, curr_y) == 0) {
-								labels.at<uchar>(curr_x, curr_y) = label;
-								count[label] ++;
-								queue.push(Point(curr_x, curr_y));
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return { labels, label, count };
-}
-
 
 Point find_P_0(Mat source) {
 	/*
@@ -388,8 +346,13 @@ contour extract_contour(Mat source, Point P_0) {
 			cont = false; 
 			loop = false;
 		}
-		if (border.size() > 2 && border[0] == border[border.size() - 2] && border[border.size() - 1] == border[1]) {
-			cont = false;
+		if (border.size() > 2) {
+
+			for (int i = 0; i < border.size() - 1; i++) {
+				if (border[border.size() - 1] == border[i])
+					cont = false;
+			}
+
 		}
 	}
 		printf("size %d\n", size);
@@ -565,7 +528,7 @@ void showHistogram(const std::string& name, vector<int> hist, const int  hist_co
 bool detectCircle(vector<int> signature) {
 
 	for (int i = 0; i < signature.size(); i++) {
-		if (signature[i] < 70) {
+		if (signature[i] < 60) {
 			return false;
 		}
 	}
@@ -574,7 +537,7 @@ bool detectCircle(vector<int> signature) {
 
 void drawResult(Point center, int max) {
 
-	max = (int) (max * 0.2) + max;
+	max = (int) (max * 0.10) + max;
 	int x = center.x - max;
 	int y = center.y - max;
 	int width = max * 2;
@@ -617,6 +580,8 @@ Mat processEdge(Mat src) {
 			for (int i = 0; i < cnt.size; i++) {
 				signature[i] = (int) 100 * ((float) signature[i] / max);
 			}
+			//int bucketSize = cnt.size/100
+
 			showHistogram("Signature", signature, 100, cnt.size);
 			if (detectCircle(signature)) {
 				drawResult(center, max);
@@ -658,15 +623,12 @@ void processInput() {
 	//imwrite("./Images/edges.bmp", detected_edges);
 	Mat inverse = inverseColors(detected_edges);
 	imshow("Detected Edges", inverse);
+	waitKey(0);
 	bool empty = false;
 	while (!empty) {
 		Mat edge = processEdge(inverse);
 		empty = isEmpty(edge);
 	}
-	
-
-	
-	
 }
 
 int main()
