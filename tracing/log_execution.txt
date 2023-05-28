@@ -3,33 +3,26 @@ EXECUTION LOG
 Transforming image to grayscale and performing edge detection
 Starting iteration through detected edges (no matter of size)
 ===============
-585 -> examining edge, length: 144
-    Checking circle: delta: 22.5454
-    Checking triangle: delta: 17.8946
-    Checking square: delta: 13.8888
-    outcome: not matched
-621 -> examining edge, length: 160
-    Checking circle: delta: 1.04365
+208 -> examining edge, length: 222
+    Checking triangle: delta: 26.2782
+    Checking square: delta: 11.3882
+    Checking reversed triangle: delta: 25.7721
+    Checking hexagon: delta: 4.3915
+    Checking circle: delta: 9.65404
     Detected circle (red)
-625 -> examining edge, length: 120
-    Checking circle: delta: 48.5833
-    Checking triangle: delta: 30.4089
-    Checking square: delta: 34.8505
+448 -> examining edge, length: 156
+    Checking triangle: delta: 25.5533
+    Checking square: delta: 34.9194
+    Checking reversed triangle: delta: 25.6944
+    Checking hexagon: delta: 45.1765
+    Checking circle: delta: 51.2222
     outcome: not matched
-981 -> examining edge, length: 260
-    Checking circle: delta: 17.994
-    Checking triangle: delta: 19.5426
-    Checking square: delta: 1.60946
-    Detected square (blue)
-1115 -> examining edge, length: 111
-    Checking circle: delta: 48.3953
-    Checking triangle: delta: 29.0138
-    Checking square: delta: 33.5722
-    outcome: not matched
-1185 -> examining edge, length: 178
-    Checking circle: delta: 44.9008
-    Checking triangle: delta: 17.6384
-    Checking square: delta: 26.8328
+478 -> examining edge, length: 111
+    Checking triangle: delta: 28.9309
+    Checking square: delta: 34.4068
+    Checking reversed triangle: delta: 30.3656
+    Checking hexagon: delta: 43.131
+    Checking circle: delta: 49.0177
     outcome: not matched
 ===============
 done.

@@ -22,10 +22,18 @@ double th_triangle = 9;
 vector<double> square_signature;
 double th_square = 3;
 
+vector<double> rev_triangle_signature;
+double th_rev_triangle = 9;
+
+vector<double> hex_signature;
+double th_hex = 9;
+
 //Mat input_color = imread("./Images/harbor.bmp", IMREAD_COLOR);
 //Mat input_color = imread("./Images/test1.bmp", IMREAD_COLOR);
 //Mat input_color = imread("./Images/test2.bmp", IMREAD_COLOR);
-Mat input_color = imread("./Images/test4.bmp", IMREAD_COLOR);
+Mat input_color = imread("./Images/test3.bmp", IMREAD_COLOR);
+//Mat input_color = imread("./Images/test4.bmp", IMREAD_COLOR);
+//Mat input_color = imread("./Images/test6.bmp", IMREAD_COLOR);
 
 typedef struct contour {
 	vector<Point> border;
@@ -569,14 +577,8 @@ bool matchSignatures(vector<double> legacy, vector<double> curr, double th_shape
 	return (delta_sum < th_shape);
 }
 
+//TODO: get min comparison
 Vec3b compareWithShapes(vector<double> curr_signature) {
-	//check if circle
-	cout << "    Checking circle: ";
-	if (matchSignatures(circle_signature, curr_signature, th_circle)) {
-		cout << "    Detected circle (red)" << endl;
-		return Vec3b(0, 0, 255);
-	}
-	
 	//check if triangle
 	cout << "    Checking triangle: ";
 	if (matchSignatures(triangle_signature, curr_signature, th_triangle)) {
@@ -590,6 +592,27 @@ Vec3b compareWithShapes(vector<double> curr_signature) {
 	if (matchSignatures(square_signature, curr_signature, th_square)) {
 		cout << "    Detected square (blue)" << endl;
 		return Vec3b(255, 0, 0);
+	}
+
+	//check if rev triangle
+	cout << "    Checking reversed triangle: ";
+	if (matchSignatures(rev_triangle_signature, curr_signature, th_square)) {
+		cout << "    Detected reversed triangle (yellow)" << endl;
+		return Vec3b(0, 255, 255);
+	}
+
+	//check if hexagon
+	cout << "    Checking hexagon: ";
+	if (matchSignatures(hex_signature, curr_signature, th_square)) {
+		cout << "    Detected hexagon (cyan)" << endl;
+		return Vec3b(255, 255, 0);
+	}
+
+	//check if circle
+	cout << "    Checking circle: ";
+	if (matchSignatures(circle_signature, curr_signature, th_circle)) {
+		cout << "    Detected circle (red)" << endl;
+		return Vec3b(0, 0, 255);
 	}
 
 	return Vec3b(0, 0, 0);
@@ -664,6 +687,13 @@ void computePerfectShapesSignatures() {
 	square_signature = getNormalizedSampledSignature(input_square);
 	imwrite("./tracing/perfect_square_hist.bmp", printFunction(square_signature, 100, 200));
 
+	Mat input_rev_triangle = imread("Images/perfect_rev_triangle.bmp", IMREAD_GRAYSCALE);
+	rev_triangle_signature = getNormalizedSampledSignature(input_rev_triangle);
+	imwrite("./tracing/perfect_rev_triangle_hist.bmp", printFunction(rev_triangle_signature, 100, 200));
+
+	Mat input_hex = imread("Images/perfect_hex_ish.bmp", IMREAD_GRAYSCALE);
+	hex_signature = getNormalizedSampledSignature(input_hex);
+	imwrite("./tracing/perfect_hex_hist.bmp", printFunction(hex_signature, 100, 200));
 }
 
 void processInput() {
