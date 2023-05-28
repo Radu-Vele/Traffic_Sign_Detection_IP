@@ -13,16 +13,19 @@ using namespace cv;
 int n8_di[8] = { 0,-1,-1, -1, 0, 1, 1, 1 };
 int n8_dj[8] = { 1, 1, 0, -1, -1,-1, 0, 1 };
 
+vector<double> circle_signature;
+double th_circle = 3;
+
+vector<double> triangle_signature;
+double th_triangle = 9;
+
+vector<double> square_signature;
+double th_square = 3;
+
 //Mat input_color = imread("./Images/harbor.bmp", IMREAD_COLOR);
 //Mat input_color = imread("./Images/test1.bmp", IMREAD_COLOR);
 //Mat input_color = imread("./Images/test2.bmp", IMREAD_COLOR);
-Mat input_color = imread("./Images/test5.bmp", IMREAD_COLOR);
-
-struct s_labels {
-	Mat labels;
-	int no_labels;
-	int* size;
-};
+Mat input_color = imread("./Images/test4.bmp", IMREAD_COLOR);
 
 typedef struct contour {
 	vector<Point> border;
@@ -284,8 +287,6 @@ Point find_P_0(Mat source) {
 	 */
 	Point P_0;
 
-	//*****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
 	for (int i = source.rows - 1; i >= 0; i--) {
 		for (int j = source.cols - 1; j >= 0; j--) {
 			if (source.at<uchar>(i, j) != 255) {
@@ -296,37 +297,31 @@ Point find_P_0(Mat source) {
 		}
 	}
 
-	//*****END OF YOUR CODE(DO NOT DELETE / MODIFY THIS LINE) *****
-
 	return P_0;
 }
 
-contour extract_contour(Mat source, Point P_0) {
-
-	/*
-	 * Use the border tracing algorithm in order to extract the contour
-	 * Save it as a vector of points and a vector of directions
-	 */
-
+contour extractContour(Mat source, Point P_0) {
 	int dir, next_dir, curr_dir, k, size = 1;
 	Point P_current;
 	std::vector<Point> border;
 	std::vector<int> dir_vector;
 	bool cont = true, found, loop = true;
-	//*****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
 	P_current = P_0;
 	border.push_back(P_current);
 	dir = 7;
+
 	while (cont) {
+		
 		if (dir % 2 == 0) {
 			next_dir = (dir + 7) % 8;
 		}
 		else {
 			next_dir = (dir + 6) % 8;
 		}
+
 		k = 0;
 		found = false;
+
 		while (k < 8 && !found) {
 			int new_i = P_current.x + n8_di[next_dir];
 			int new_j = P_current.y + n8_dj[next_dir];
@@ -339,39 +334,32 @@ contour extract_contour(Mat source, Point P_0) {
 				found = true;
 				size++;
 			}
+
 			k++;
 			next_dir = (next_dir + 1) % 8;
 		}
+
 		if (k == 8) {
 			cont = false; 
 			loop = false;
 		}
-		if (border.size() > 2) {
 
+		if (border.size() > 2) {
 			for (int i = 0; i < border.size() - 1; i++) {
 				if (border[border.size() - 1] == border[i])
 					cont = false;
 			}
-
 		}
 	}
-		printf("size %d\n", size);
 
 		return { border, dir_vector, loop, size };
-
-	
 }
 
-Mat draw_contour(contour cnt, Mat source) {
-
-	/*
-	 * Draw the contour using the border variable from cnt structure
-	 */
-
+/*
+* Draw the contour using the border variable from cnt structure
+*/
+Mat drawContour(contour cnt, Mat source) {
 	Mat dst;
-
-	//*****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
 	dst = source.clone();
 	for (int i = 0; i < source.rows; i++) {
 		for (int j = 0; j < source.cols; j++) {
@@ -381,38 +369,7 @@ Mat draw_contour(contour cnt, Mat source) {
 	for (int i = 0; i < cnt.border.size(); i++) {
 		dst.at<uchar>(cnt.border[i].x, cnt.border[i].y) = 0;
 	}
-
-	//*****END OF YOUR CODE(DO NOT DELETE / MODIFY THIS LINE) *****
-
-
 	return dst;
-}
-
-
-Mat contour_reconstruction(FILE* pf, Mat background) {
-
-	/*
-	 * From the file read the chain code and reconstruct the image
-	 */
-
-	int x, y, chain_len, dir, count = 0;
-
-	//*****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-	fscanf(pf, "%d %d %d", &x, &y, &chain_len);
-
-	Point P_current = Point(x, y);
-	background.at<uchar>(P_current.y, P_current.x) = 0;
-	for (int i = 0; i < chain_len; i++) {
-		fscanf(pf, "%d", &dir);
-		P_current.x += n8_di[dir];
-		P_current.y += n8_dj[dir];
-		background.at<uchar>(P_current.x, P_current.y) = 0;
-	}
-	//*****END OF YOUR CODE(DO NOT DELETE / MODIFY THIS LINE) *****
-
-	return background;
-
 }
 
 Mat inverseColors(Mat src) {
@@ -431,7 +388,6 @@ Mat inverseColors(Mat src) {
 }
 
 Point getCenter(Mat binary_object) {
-
 	int rows = binary_object.rows;
 	int cols = binary_object.cols;
 
@@ -454,19 +410,13 @@ Point getCenter(Mat binary_object) {
 }
 
 Mat display_center_of_mass(Point center_of_mass, Mat source) {
-
-	/*
-	 * This method will display on the source image the center_of_mass
-	 * Hint: Use the circle method from OpenCv, clone the source
-	 */
 	Mat result;
-	//*****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 	result = source.clone();
 	circle(result, center_of_mass, 5, Scalar(0, 0, 0), 1);
-	//*****END OF YOUR CODE(DO NOT DELETE / MODIFY THIS LINE) ****
 
 	return result;
 }
+
 Mat deleteEdge(Mat src, Mat edge) {
 
 	int rows = src.rows;
@@ -479,46 +429,50 @@ Mat deleteEdge(Mat src, Mat edge) {
 			}
 		}
 	}
+
 	return src;
 }
 
-vector<int> getSignature(contour cnt, Point center) {
+vector<double> getSignature(contour cnt, Point center) {
 
-	vector<int> signature;
+	vector<double> signature;
 	vector<Point> border = cnt.border;
 	int size = cnt.size;
 	int dist;
 
+	//compute euclidean distance to center for each point in the border
 	for (int i = 0; i < size; i++) {
-
-		int x = center.x - border[i].y;
-		int y = center.y - border[i].x;
+		double x = (double) center.x - border[i].y; 
+		double y = (double) center.y - border[i].x; 
 		double partial = sqrt(x * x + y * y);
-		printf("%f", partial);
-		dist = (int) sqrt(x * x + y * y);
+
+		dist = sqrt(x * x + y * y);
 		signature.push_back(dist);
-		printf("%d ", dist);
 	}
 
 	return signature;
 }
 
-void showHistogram(const std::string& name, vector<int> hist, const int  hist_cols, const int hist_height)
-{
-	Mat imgHist(hist_height, hist_cols, CV_8UC3, CV_RGB(255, 255, 255)); // constructs a white image
+void printFunction(const std::string& name, vector<double> values, const int  interval_length, const int img_height) {
+	Mat imgHist(img_height, interval_length, CV_8UC3, CV_RGB(255, 255, 255)); // constructs a white image
 
 	//computes histogram maximum
-	int max_hist = 0;
-	for (int i = 0; i < hist_cols; i++)
-		if (hist[i] > max_hist)
-			max_hist = hist[i];
-	double scale = 1.0;
-	scale = (double)hist_height / max_hist;
-	int baseline = hist_height - 1;
+	vector<int> scaled_vals;
+	int max_vals = 0;
+	for (int i = 0; i < interval_length; i++) {
+		scaled_vals.push_back((int) (values[i] * 100));
+		if (scaled_vals[i] > max_vals) {
+			max_vals = scaled_vals[i];
+		}
+	}
 
-	for (int x = 0; x < hist_cols; x++) {
+	double scale = 1.0;
+	scale = (double)img_height / max_vals;
+	int baseline = img_height - 1;
+
+	for (int x = 0; x < interval_length; x++) {
 		Point p1 = Point(x, baseline);
-		Point p2 = Point(x, baseline - cvRound(hist[x] * scale));
+		Point p2 = Point(x, baseline - cvRound(scaled_vals[x] * scale));
 		line(imgHist, p1, p2, CV_RGB(255, 0, 255)); // histogram bins colored in magenta
 	}
 
@@ -535,8 +489,7 @@ bool detectCircle(vector<int> signature) {
 	return true;
 }
 
-void drawResult(Point center, int max) {
-
+void drawResult(Mat curr_result, Vec3b box_color, Point center, int max) {
 	max = (int) (max * 0.10) + max;
 	int x = center.x - max;
 	int y = center.y - max;
@@ -549,52 +502,135 @@ void drawResult(Point center, int max) {
 	// and its bottom right corner.
 	cv::Point pt2(x + width, y + height);
 	// These two calls...
-	cv::rectangle(input_color, pt1, pt2, cv::Scalar(0, 255, 0));
-	
-	imshow("Result", input_color);
-	waitKey(0);
+	cv::rectangle(curr_result, pt1, pt2, box_color);
 }
 
-Mat processEdge(Mat src) {
+/*
+* Have all histogram values between lower and upper;
+*/
+vector<double> rescaleArray(vector<double> input, double lower, double upper) {
+	int hist_size = input.size();
+	double sum = 0;
+	double min = 0; //consider the min distance 0
+	double max = -1;
+	vector<double> normalized_hist;
 
-	Point P_0 = find_P_0(src);
-	printf("First %d %d\n", P_0.x, P_0.y);
-	contour cnt = extract_contour(src, P_0);
-
-	Mat mat_cnt = draw_contour(cnt, src);
-	Point center = getCenter(mat_cnt);
-	printf("Center %d %d\n", center.x, center.y);
-
-	
-
-	if (cnt.loop) {
-		vector<int> signature = getSignature(cnt, center);
-		int max = 0;
-		for (int i = 0; i < cnt.size; i++) {
-			if (signature[i] > max) {
-				max = signature[i];
-			}
+	for (int i = 0; i < hist_size; i++) {
+		if (input[i] > max) {
+			max = input[i];
 		}
+	}
+
+	for (int i = 0; i < hist_size; i++) {
+		float scaled_value = (input[i] - min) * (upper - lower) / (max - min) + lower; //fit in the wanted interval
+		normalized_hist.push_back(scaled_value);
+	}
+
+	return normalized_hist;
+}
+
+vector<double> compressSignature(vector<double> input, int wanted_size) {
+	int size = input.size();
+	double step_size = (double) size / wanted_size;
+	vector<double> compressed;
+	
+	for (int i = 0; i < wanted_size; i++) {
+		double curr_index = i * step_size;
+		int leftIndex = floor(curr_index);
+		int rightIndex = ceil(curr_index);
+
+		double leftVal = input[leftIndex];
+		double rightVal = input[rightIndex];
+
+		double new_value = leftVal + (curr_index - leftIndex) * (rightVal - leftVal);
+		compressed.push_back(new_value);
+	}
+	
+	return compressed;
+}
+
+vector<double> getNormalizedSampledSignature(Mat src) {
+	Point P_0 = find_P_0(src); //first point of the edge
+	contour cnt = extractContour(src, P_0);
+	Mat mat_cnt = drawContour(cnt, src);
+	Point center = getCenter(mat_cnt);
+	vector<double> signature = getSignature(cnt, center);
+	vector<double> normalized_signature = rescaleArray(signature, 0.0, 1.0);
+	vector<double> compressed_signature = compressSignature(normalized_signature, 100);
+
+	return compressed_signature;
+}
+
+double getMaxElem(vector<double> input) {
+	int size = input.size();
+	int max_val = INT_MIN;
+
+	for (int i = 0; i < size; i++) {
+		if (input[i] > max_val) {
+			max_val = input[i];
+		}
+	}
+
+	return max_val;
+}
+
+bool matchSignatures(vector<double> legacy, vector<double> curr, double th_shape) {
+	int signature_size = curr.size();
+	double delta_sum = 0;
+	for (int i = 0; i < signature_size; i++) {
+		delta_sum += abs(legacy[i] - curr[i]);
+	}
+	return (delta_sum < th_shape);
+}
+
+Vec3b compareWithShapes(vector<double> curr_signature) {
+	//check if circle
+	if (matchSignatures(circle_signature, curr_signature, th_circle)) {
+		printf("Detected circle \n");
+		return Vec3b(0, 0, 255);
+	}
+	
+	//check if triangle
+	if (matchSignatures(triangle_signature, curr_signature, th_triangle)) {
+		printf("Detected triangle \n");
+		return Vec3b(0, 255, 0);
+		return true;
+	}
+	
+	//check if square
+	if (matchSignatures(square_signature, curr_signature, th_square)) {
+		printf("Detected square \n");
+		return Vec3b(255, 0, 255);
+	}
+
+	return Vec3b(0, 0, 0);
+}
+
+Mat processEdge(Mat src, Mat curr_result) {
+	Point P_0 = find_P_0(src);
+	contour cnt = extractContour(src, P_0);
+	Mat mat_cnt = drawContour(cnt, src);
+	Point center = getCenter(mat_cnt);
+
+	if (cnt.loop) { //process only shapes that have a loop and are larger than 100
 		if (cnt.size > 100) {
+			vector<double> signature = getSignature(cnt, center);
+			int max_dist = (int)getMaxElem(signature);
+			vector<double> normalized_signature = rescaleArray(signature, 0.0, 1.0);
+			vector<double> compressed_signature = compressSignature(normalized_signature, 100);
 
-			for (int i = 0; i < cnt.size; i++) {
-				signature[i] = (int) 100 * ((float) signature[i] / max);
+			Vec3b color_result = compareWithShapes(compressed_signature);
+			if (!(color_result == Vec3b(0, 0, 0))) { // a color is returned
+				//enclose in bounding box colored w.r.t shape
+				drawResult(curr_result, color_result, center, max_dist);
 			}
-			//int bucketSize = cnt.size/100
 
-			showHistogram("Signature", signature, 100, cnt.size);
-			if (detectCircle(signature)) {
-				drawResult(center, max);
-			}
-			//imshow("Contour", mat_cnt);
 			imshow("center", display_center_of_mass(center, mat_cnt));
 			waitKey(0);
-		}
-		
+		}		
 	}
 
 	Mat dst = deleteEdge(src, mat_cnt);
-
 	return dst;
 }
 
@@ -613,25 +649,37 @@ bool isEmpty(Mat src) {
 	return true;
 }
 
+void computePerfectShapesSignatures() {
+	Mat input_circle = imread("Images/perfect_circle.bmp", IMREAD_GRAYSCALE);
+	circle_signature = getNormalizedSampledSignature(input_circle);
+	
+	Mat input_triangle = imread("Images/perfect_triangle.bmp", IMREAD_GRAYSCALE);
+	triangle_signature = getNormalizedSampledSignature(input_triangle);
+	
+	Mat input_square = imread("Images/perfect_square.bmp", IMREAD_GRAYSCALE);
+	square_signature = getNormalizedSampledSignature(input_square);
+}
 
 void processInput() {
-	
 	Mat input_gray = colorToGrayscale(input_color);
 	imshow("Input Gray", input_gray);
 	Mat detected_edges = cannyEdgeDetection(input_gray);
-	
-	//imwrite("./Images/edges.bmp", detected_edges);
 	Mat inverse = inverseColors(detected_edges);
-	imshow("Detected Edges", inverse);
+	imshow("Edges inversed", inverse);
 	waitKey(0);
+
+	//process all edges (check if sign)
 	bool empty = false;
 	while (!empty) {
-		Mat edge = processEdge(inverse);
+		Mat edge = processEdge(inverse, input_color);
 		empty = isEmpty(edge);
 	}
+
+	imshow("Final result", input_color);
+	waitKey(0);
 }
 
-int main()
-{
+int main() {
+	computePerfectShapesSignatures();
 	processInput();
 }
