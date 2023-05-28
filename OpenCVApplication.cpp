@@ -14,7 +14,7 @@ int n8_di[8] = { 0,-1,-1, -1, 0, 1, 1, 1 };
 int n8_dj[8] = { 1, 1, 0, -1, -1,-1, 0, 1 };
 
 vector<double> circle_signature;
-double th_circle = 3;
+double th_circle = 12;
 
 vector<double> triangle_signature;
 double th_triangle = 9;
@@ -138,7 +138,6 @@ bool outOfBounds(int curr_i, int curr_j, int rows, int cols) {
 	}
 	return false;
 }
-
 
 Mat cannyEdgeDetection(Mat src) {
 	int rows = src.rows;
@@ -279,7 +278,6 @@ Mat cannyEdgeDetection(Mat src) {
 
 	return scaled_magnitude_th;
 }
-
 
 Point find_P_0(Mat source) {
 	/*
@@ -453,7 +451,7 @@ vector<double> getSignature(contour cnt, Point center) {
 	return signature;
 }
 
-void printFunction(const std::string& name, vector<double> values, const int  interval_length, const int img_height) {
+Mat printFunction(vector<double> values, const int  interval_length, const int img_height) {
 	Mat imgHist(img_height, interval_length, CV_8UC3, CV_RGB(255, 255, 255)); // constructs a white image
 
 	//computes histogram maximum
@@ -476,7 +474,7 @@ void printFunction(const std::string& name, vector<double> values, const int  in
 		line(imgHist, p1, p2, CV_RGB(255, 0, 255)); // histogram bins colored in magenta
 	}
 
-	imshow(name, imgHist);
+	return imgHist;
 }
 
 bool detectCircle(vector<int> signature) {
@@ -489,7 +487,7 @@ bool detectCircle(vector<int> signature) {
 	return true;
 }
 
-void drawResult(Mat curr_result, Vec3b box_color, Point center, int max) {
+void appendToResult(Mat curr_result, Vec3b box_color, Point center, int max) {
 	max = (int) (max * 0.10) + max;
 	int x = center.x - max;
 	int y = center.y - max;
@@ -580,33 +578,39 @@ bool matchSignatures(vector<double> legacy, vector<double> curr, double th_shape
 	for (int i = 0; i < signature_size; i++) {
 		delta_sum += abs(legacy[i] - curr[i]);
 	}
+
+	cout << "delta: " << delta_sum << endl;
+
 	return (delta_sum < th_shape);
 }
 
 Vec3b compareWithShapes(vector<double> curr_signature) {
 	//check if circle
+	cout << "    Checking circle: ";
 	if (matchSignatures(circle_signature, curr_signature, th_circle)) {
-		printf("Detected circle \n");
+		cout << "    Detected circle (red)" << endl;
 		return Vec3b(0, 0, 255);
 	}
 	
 	//check if triangle
+	cout << "    Checking triangle: ";
 	if (matchSignatures(triangle_signature, curr_signature, th_triangle)) {
-		printf("Detected triangle \n");
+		cout << "    Detected triangle (green)" << endl;
 		return Vec3b(0, 255, 0);
 		return true;
 	}
 	
 	//check if square
+	cout << "    Checking square: ";
 	if (matchSignatures(square_signature, curr_signature, th_square)) {
-		printf("Detected square \n");
-		return Vec3b(255, 0, 255);
+		cout << "    Detected square (blue)" << endl;
+		return Vec3b(255, 0, 0);
 	}
 
 	return Vec3b(0, 0, 0);
 }
 
-Mat processEdge(Mat src, Mat curr_result) {
+Mat processEdge(Mat src, Mat curr_result, int iteration_number) {
 	Point P_0 = find_P_0(src);
 	contour cnt = extractContour(src, P_0);
 	Mat mat_cnt = drawContour(cnt, src);
@@ -614,20 +618,33 @@ Mat processEdge(Mat src, Mat curr_result) {
 
 	if (cnt.loop) { //process only shapes that have a loop and are larger than 100
 		if (cnt.size > 100) {
+
+			cout << iteration_number << " -> examining edge, length: " << cnt.size << endl;
+
 			vector<double> signature = getSignature(cnt, center);
 			int max_dist = (int)getMaxElem(signature);
 			vector<double> normalized_signature = rescaleArray(signature, 0.0, 1.0);
 			vector<double> compressed_signature = compressSignature(normalized_signature, 100);
 
+			string out_path_hist = "./tracing/";
+			out_path_hist += to_string(iteration_number);
+			out_path_hist += "_examined_edge_hist.bmp";
+			imwrite(out_path_hist, printFunction(compressed_signature, 100, 200));
+
 			Vec3b color_result = compareWithShapes(compressed_signature);
 			if (!(color_result == Vec3b(0, 0, 0))) { // a color is returned
 				//enclose in bounding box colored w.r.t shape
-				drawResult(curr_result, color_result, center, max_dist);
+				appendToResult(curr_result, color_result, center, max_dist);
+			}
+			else {
+				cout << "    outcome: not matched" << endl;
 			}
 
-			imshow("center", display_center_of_mass(center, mat_cnt));
-			waitKey(0);
-		}		
+			string out_path = "./tracing/";
+			out_path += to_string(iteration_number);
+			out_path += "_examined_edge.bmp";
+			imwrite(out_path, display_center_of_mass(center, mat_cnt));
+		}	
 	}
 
 	Mat dst = deleteEdge(src, mat_cnt);
@@ -652,34 +669,51 @@ bool isEmpty(Mat src) {
 void computePerfectShapesSignatures() {
 	Mat input_circle = imread("Images/perfect_circle.bmp", IMREAD_GRAYSCALE);
 	circle_signature = getNormalizedSampledSignature(input_circle);
+	imwrite("./tracing/perfect_circle_hist.bmp", printFunction(circle_signature, 100, 200));
 	
 	Mat input_triangle = imread("Images/perfect_triangle.bmp", IMREAD_GRAYSCALE);
 	triangle_signature = getNormalizedSampledSignature(input_triangle);
+	imwrite("./tracing/perfect_triangle_hist.bmp", printFunction(triangle_signature, 100, 200));
 	
 	Mat input_square = imread("Images/perfect_square.bmp", IMREAD_GRAYSCALE);
 	square_signature = getNormalizedSampledSignature(input_square);
+	imwrite("./tracing/perfect_square_hist.bmp", printFunction(square_signature, 100, 200));
+
 }
 
 void processInput() {
-	Mat input_gray = colorToGrayscale(input_color);
-	imshow("Input Gray", input_gray);
-	Mat detected_edges = cannyEdgeDetection(input_gray);
-	Mat inverse = inverseColors(detected_edges);
-	imshow("Edges inversed", inverse);
-	waitKey(0);
+	
+	cout << "Transforming image to grayscale and performing edge detection" << endl;
 
+	// transform input to grayscale
+	Mat input_gray = colorToGrayscale(input_color);
+	imwrite("./tracing/0.to_grayscale.bmp", input_gray);
+	
+	Mat detected_edges = cannyEdgeDetection(input_gray);
+	imwrite("./tracing/1.det_edges.bmp", detected_edges);
+
+	Mat inverse = inverseColors(detected_edges);
+	imwrite("./tracing/1.1.det_edges_inversed.bmp", inverse);
+	
+	cout << "Starting iteration through detected edges (no matter of size)" << endl << "===============" << endl;
 	//process all edges (check if sign)
+	int iteration_nr = 2; //for tracing purposes
 	bool empty = false;
 	while (!empty) {
-		Mat edge = processEdge(inverse, input_color);
+		Mat edge = processEdge(inverse, input_color, iteration_nr);
 		empty = isEmpty(edge);
+		iteration_nr++;
 	}
 
-	imshow("Final result", input_color);
-	waitKey(0);
+	imwrite("./tracing/z.final_result.bmp", input_color);
 }
 
 int main() {
+	freopen("./tracing/log_execution.txt", "w", stdout); //log file
+	cout << "EXECUTION LOG" << endl << "===============" << endl;
+
 	computePerfectShapesSignatures();
 	processInput();
+	
+	cout << "===============" << endl << "done." << endl;
 }
