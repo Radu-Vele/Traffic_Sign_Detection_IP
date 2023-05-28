@@ -477,16 +477,6 @@ Mat printFunction(vector<double> values, const int  interval_length, const int i
 	return imgHist;
 }
 
-bool detectCircle(vector<int> signature) {
-
-	for (int i = 0; i < signature.size(); i++) {
-		if (signature[i] < 60) {
-			return false;
-		}
-	}
-	return true;
-}
-
 void appendToResult(Mat curr_result, Vec3b box_color, Point center, int max) {
 	max = (int) (max * 0.10) + max;
 	int x = center.x - max;
@@ -534,15 +524,10 @@ vector<double> compressSignature(vector<double> input, int wanted_size) {
 	
 	for (int i = 0; i < wanted_size; i++) {
 		double curr_index = i * step_size;
-		int leftIndex = floor(curr_index);
-		int rightIndex = ceil(curr_index);
+		double original_val = input[curr_index];
 
-		double leftVal = input[leftIndex];
-		double rightVal = input[rightIndex];
-
-		double new_value = leftVal + (curr_index - leftIndex) * (rightVal - leftVal);
-		compressed.push_back(new_value);
-	}
+		compressed.push_back(original_val);
+	 }
 	
 	return compressed;
 }

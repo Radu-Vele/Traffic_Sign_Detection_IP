@@ -4,32 +4,32 @@ Transforming image to grayscale and performing edge detection
 Starting iteration through detected edges (no matter of size)
 ===============
 585 -> examining edge, length: 144
-    Checking circle: delta: 22.514
-    Checking triangle: delta: 17.8858
-    Checking square: delta: 13.8107
+    Checking circle: delta: 22.5454
+    Checking triangle: delta: 17.8946
+    Checking square: delta: 13.8888
     outcome: not matched
 621 -> examining edge, length: 160
-    Checking circle: delta: 1.20083
+    Checking circle: delta: 1.04365
     Detected circle (red)
 625 -> examining edge, length: 120
-    Checking circle: delta: 48.5467
-    Checking triangle: delta: 30.4071
-    Checking square: delta: 34.9613
+    Checking circle: delta: 48.5833
+    Checking triangle: delta: 30.4089
+    Checking square: delta: 34.8505
     outcome: not matched
 981 -> examining edge, length: 260
-    Checking circle: delta: 17.9212
-    Checking triangle: delta: 19.559
-    Checking square: delta: 1.56217
+    Checking circle: delta: 17.994
+    Checking triangle: delta: 19.5426
+    Checking square: delta: 1.60946
     Detected square (blue)
 1115 -> examining edge, length: 111
-    Checking circle: delta: 48.3521
-    Checking triangle: delta: 29.0341
-    Checking square: delta: 33.6739
+    Checking circle: delta: 48.3953
+    Checking triangle: delta: 29.0138
+    Checking square: delta: 33.5722
     outcome: not matched
 1185 -> examining edge, length: 178
-    Checking circle: delta: 44.7823
-    Checking triangle: delta: 17.4587
-    Checking square: delta: 26.6697
+    Checking circle: delta: 44.9008
+    Checking triangle: delta: 17.6384
+    Checking square: delta: 26.8328
     outcome: not matched
 ===============
 done.
